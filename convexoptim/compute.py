@@ -48,7 +48,7 @@ def backtracking_line_search(
     p: np.ndarray,
     alpha: float = 0.01,
     beta: float = 0.8,
-) -> float:
+) -> tuple[float, float]:
     """
     Perform backtracking line search to find step size.
 
@@ -62,10 +62,15 @@ def backtracking_line_search(
     Returns:
         Step size t
     """
-    t = 1.0
-    while f_eval(t) > f_eval(0) + alpha * t * grad.T @ p:
+    t = 0.1
+    f_0 = f_eval(0)
+    print("f0", f_0)
+    print(f_eval(t))
+
+    while f_eval(t) > f_0 + alpha * t * grad.T @ p:
         t *= beta
-    return t
+        print(f_eval(t))
+    return t, f_eval(t)
 
 
 def evaluate_objective(
@@ -74,8 +79,11 @@ def evaluate_objective(
     """
     Evaluate the barrier objective function.
     """
+    print(v)
     quad_term = t * (v.T @ Q @ v + p.T @ v)
     barrier_term = -np.sum(np.log(b - A @ v))
+    print(barrier_term)
+    print(quad_term)
     return quad_term + barrier_term
 
 
@@ -87,7 +95,7 @@ def centering_step(
     t: float,
     v0: np.ndarray,
     eps: float,
-) -> list[np.ndarray]:
+) -> tuple[list[np.ndarray], list[float]]:
     """
     Implement Newton method for the centering step.
 
@@ -105,6 +113,7 @@ def centering_step(
     """
     v = v0.copy()
     v_seq = [v.copy()]
+    f_seq: list[float] = []
 
     while True:
         # 1. Compute Newton step and decrement
@@ -117,16 +126,19 @@ def centering_step(
             break
 
         # 3. Line search
-        def f_eval(step: float, v: np.ndarray, delta_v: np.ndarray) -> float:
+        def f_eval(
+            step: float, v: np.ndarray = v, delta_v: np.ndarray = delta_v
+        ) -> float:
             return evaluate_objective(Q, p, A, b, t, v + step * delta_v)
 
-        step_size = backtracking_line_search(f_eval, grad, delta_v)
-
+        step_size, f_value = backtracking_line_search(f_eval, grad, delta_v)
+        print(f_value)
         # 4. Update
         v = v + step_size * delta_v
         v_seq.append(v.copy())
+        f_seq.append(f_value)
 
-    return v_seq
+    return v_seq, f_seq
 
 
 def barr_method(
@@ -137,7 +149,7 @@ def barr_method(
     v0: np.ndarray,
     eps: float,
     mu: float,
-) -> list[np.ndarray]:
+) -> tuple[list[np.ndarray], list[float]]:
     """
     Implement the barrier method for QP.
 
@@ -156,15 +168,17 @@ def barr_method(
     t = 1.0
     v = v0.copy()
     v_seq = [v.copy()]
+    f_seq: list[float] = []
     m = len(b)  # Number of inequality constraints
 
     while m / t > eps:
         # Solve centering step
-        v_centering = centering_step(Q, p, A, b, t, v, eps)
+        v_centering, f_centering = centering_step(Q, p, A, b, t, v, eps)
         v = v_centering[-1]
-        v_seq.extend(v_centering)
 
+        v_seq.extend(v_centering)
+        f_seq.extend(f_centering)
         # Update t
         t *= mu
 
-    return v_seq
+    return v_seq, f_seq

@@ -1,2 +1,3 @@
 .vscode/
 convexoptim.egg-info/
+**/__pycache__/
