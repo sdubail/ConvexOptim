@@ -13,19 +13,8 @@ def plot_convergence(
     eps: float,
     base_lr: float,
 ) -> None:
-    """
-    Plot both the criterion evolution and convergence to optimal value.
-
-    Args:
-        f_seq_multi: List of lists containing objective function values for computing difference from optimal
-        crit_seq_multi: List of lists containing criterion values evolution
-        mu: List of mu values used
-        n, d, lamda, eps, base_lr: Parameters for filename
-    """
-    # Create figure with two subplots
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
 
-    # First subplot: Criterion evolution
     for crit_seq, mu_i in zip(crit_seq_multi, mu, strict=False):
         crit_array = np.array(crit_seq)
         ax1.semilogy(
@@ -42,7 +31,6 @@ def plot_convergence(
     ax1.set_title("Evolution of precision criterion", fontsize=14)
     ax1.legend()
 
-    # Second subplot: Difference from optimal value
     for f_seq, mu_i in zip(f_seq_multi, mu, strict=False):
         f_array = np.array(f_seq)
         f_diff = f_array - f_array[-1]
@@ -60,17 +48,14 @@ def plot_convergence(
     ax2.set_title("Convergence to optimal value", fontsize=14)
     ax2.legend()
 
-    # Adjust layout to prevent overlap
     plt.tight_layout()
 
-    # Save figure
     plt.savefig(
         f"convergence_n_{n}_d_{d}_lamda_{lamda}_eps_{eps}_baselr_{base_lr}.png",
         bbox_inches="tight",
         dpi=300,
     )
 
-    # Close the figure to free memory
     plt.close()
 
 
@@ -83,10 +68,8 @@ def optimise(
     mu: float,
     base_lr: float,
 ) -> tuple[list[np.ndarray], list[float], list[float]]:
-    # Problem dimensions
     n, d = X.shape
 
-    # Problem variables
     Q = (1 / 2) * np.eye(N=n)
     p = y
     A = np.vstack((X.T, -X.T))
@@ -116,13 +99,10 @@ def gen_data(
     """
     np.random.seed(seed)
 
-    # Generate random features
     X = np.random.randn(n, d)
 
-    # Generate true coefficients
     true_coeffs = np.random.randn(d)
 
-    # Generate target variable with some noise
     noise = np.random.normal(0, 0.1, n)
     y = X @ true_coeffs + noise
 
@@ -134,11 +114,11 @@ def main() -> None:
     lamda = 10
     eps = 0.01
     base_lr = 1
-    n = 100  # number of samples
-    d = 20  # number of features
+    n = 100
+    d = 20
     X, y, true_w = gen_data(n, d)
 
-    v0 = np.zeros(X.shape[0])  # not sure that 0 is a good idea
+    v0 = np.zeros(X.shape[0])
     f_seq_multi = []
     v_seq_multi = []
     crit_seq_multi = []
@@ -151,20 +131,14 @@ def main() -> None:
 
     plot_convergence(f_seq_multi, crit_seq_multi, mu, n, d, lamda, eps, base_lr)
 
-    # At optimum :
-    # v = z = Xw - y
-    # X.T @ (v + y) = X.T @ Xw
-    # (X.T @ X)^-1 @ X.T (v + y) = w
     plt.figure(figsize=(10, 6))
 
-    # Calculate errors
     w_err = []
     for v_seq in v_seq_multi:
         v_opti = v_seq[-1]
         w = np.linalg.pinv(X.T @ X) @ X.T @ (v_opti + y)
         w_err.append(np.sum(((w - true_w) ** 2) / true_w**2) / d)
 
-    # Create enhanced plot
     plt.plot(
         mu,
         w_err,
@@ -175,16 +149,13 @@ def main() -> None:
         label="Weight Error",
     )
 
-    # Add labels and title
     plt.xlabel("μ Parameter", fontsize=12)
     plt.ylabel("Normalized Weight Error", fontsize=12)
     plt.title("Weight Error vs. μ Parameter", fontsize=14, pad=15)
 
-    # Customize grid and layout
     plt.grid(True, linestyle="--", alpha=0.7)
     plt.legend(fontsize=10)
 
-    # Adjust layout to prevent label clipping
     plt.tight_layout()
     plt.savefig("w_err_mu.png")
 

@@ -20,21 +20,15 @@ def compute_gradient_hessian(
     Returns:
         Tuple of (gradient, inverse_hessian)
     """
-    # Compute Av for constraints
     Av = A @ v
+    grad = t * (2 * Q @ v + p)
 
-    # Initialize gradient components
-    grad = t * (2 * Q @ v + p)  # Term from quadratic objective
-
-    # Add logarithmic barrier terms
     for i in range(len(b)):
         ai = A[i, :]  # i-th row of A
         grad += ai / (b[i] - Av[i])
 
-    # Compute Hessian inverse
-    hess = t * 2 * Q  # Term from quadratic objective
+    hess = t * 2 * Q
 
-    # Add barrier terms to Hessian
     for i in range(len(b)):
         ai = A[i, :]
         hess += np.outer(ai, ai) / (b[i] - Av[i]) ** 2
@@ -59,9 +53,10 @@ def backtracking_line_search(
         p: Search direction
         alpha: Line search parameter (default: 0.01)
         beta: Line search parameter (default: 0.8)
+        base_lr: Line search parameter (default: 1.0)
 
     Returns:
-        Step size t
+        Step size t, function value at given step
     """
     t_step = base_lr  # really sensitive : can go in places where log is undefined
     f_0, f_t = f_eval(0), f_eval(t_step)
@@ -112,16 +107,13 @@ def centering_step(
     f_seq: list[float] = []
 
     while True:
-        # 1. Compute Newton step and decrement
         grad, hess_inv = compute_gradient_hessian(Q, p, A, b, t, v)
         delta_v = -hess_inv @ grad
         lambda_sq = -grad.T @ delta_v
 
-        # 2. Stopping criterion
         if lambda_sq / 2 <= eps:
             break
 
-        # 3. Line search
         def f_eval(
             step: float, v: np.ndarray = v, delta_v: np.ndarray = delta_v
         ) -> float:
@@ -130,7 +122,6 @@ def centering_step(
         step_size, f_value = backtracking_line_search(
             f_eval, grad, delta_v, base_lr=base_lr
         )
-        # 4. Update
         v = v + step_size * delta_v
         v_seq.append(v.copy())
         f_seq.append(f_value)
@@ -162,21 +153,19 @@ def barr_method(
     Returns:
         List of iterates
     """
-    # Initialize parameters
     t = 1.0
     v = v0.copy()
     v_seq = [v.copy()]
     f_seq: list[float] = []
-    m = len(b)  # Number of inequality constraints
+    m = len(b)
     crit_seq: list[float] = [m / t]
     while m / t > eps:
-        # Solve centering step
         v_centering, f_centering = centering_step(Q, p, A, b, t, v, eps, base_lr)
         v = v_centering[-1]
 
         v_seq.extend(v_centering)
         f_seq.extend(f_centering)
-        # Update t
+
         t *= mu
         crit_seq.append(m / t)
 
