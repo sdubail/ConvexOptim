@@ -9,4 +9,4 @@ To install all dependencies :
 
 To run main script :
 
-    $ python __main__.py
+    $ python convexoptim/__main__.py
