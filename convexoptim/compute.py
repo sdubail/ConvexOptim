@@ -48,6 +48,7 @@ def backtracking_line_search(
     p: np.ndarray,
     alpha: float = 0.01,
     beta: float = 0.8,
+    base_lr: float = 1.0,
 ) -> tuple[float, float]:
     """
     Perform backtracking line search to find step size.
@@ -62,15 +63,12 @@ def backtracking_line_search(
     Returns:
         Step size t
     """
-    t = 0.1
-    f_0 = f_eval(0)
-    print("f0", f_0)
-    print(f_eval(t))
-
-    while f_eval(t) > f_0 + alpha * t * grad.T @ p:
-        t *= beta
-        print(f_eval(t))
-    return t, f_eval(t)
+    t_step = base_lr  # really sensitive : can go in places where log is undefined
+    f_0, f_t = f_eval(0), f_eval(t_step)
+    while f_t > f_0 + alpha * t_step * grad.T @ p or np.isnan(f_t):
+        t_step *= beta
+        f_t = f_eval(t_step)
+    return t_step, f_t
 
 
 def evaluate_objective(
@@ -79,11 +77,8 @@ def evaluate_objective(
     """
     Evaluate the barrier objective function.
     """
-    print(v)
     quad_term = t * (v.T @ Q @ v + p.T @ v)
     barrier_term = -np.sum(np.log(b - A @ v))
-    print(barrier_term)
-    print(quad_term)
     return quad_term + barrier_term
 
 
@@ -95,6 +90,7 @@ def centering_step(
     t: float,
     v0: np.ndarray,
     eps: float,
+    base_lr: float,
 ) -> tuple[list[np.ndarray], list[float]]:
     """
     Implement Newton method for the centering step.
@@ -131,8 +127,9 @@ def centering_step(
         ) -> float:
             return evaluate_objective(Q, p, A, b, t, v + step * delta_v)
 
-        step_size, f_value = backtracking_line_search(f_eval, grad, delta_v)
-        print(f_value)
+        step_size, f_value = backtracking_line_search(
+            f_eval, grad, delta_v, base_lr=base_lr
+        )
         # 4. Update
         v = v + step_size * delta_v
         v_seq.append(v.copy())
@@ -149,7 +146,8 @@ def barr_method(
     v0: np.ndarray,
     eps: float,
     mu: float,
-) -> tuple[list[np.ndarray], list[float]]:
+    base_lr: float,
+) -> tuple[list[np.ndarray], list[float], list[float]]:
     """
     Implement the barrier method for QP.
 
@@ -170,15 +168,16 @@ def barr_method(
     v_seq = [v.copy()]
     f_seq: list[float] = []
     m = len(b)  # Number of inequality constraints
-
+    crit_seq: list[float] = [m / t]
     while m / t > eps:
         # Solve centering step
-        v_centering, f_centering = centering_step(Q, p, A, b, t, v, eps)
+        v_centering, f_centering = centering_step(Q, p, A, b, t, v, eps, base_lr)
         v = v_centering[-1]
 
         v_seq.extend(v_centering)
         f_seq.extend(f_centering)
         # Update t
         t *= mu
+        crit_seq.append(m / t)
 
-    return v_seq, f_seq
+    return v_seq, f_seq, crit_seq
